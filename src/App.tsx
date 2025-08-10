@@ -467,21 +467,21 @@ function MapWithVelocity() {
       </div>
 
       <div id="map" className="map" />
-            {/* Badge GitHub */}
-            <div style={{
+        {/* Badge GitHub */}
+        <div style={{
         position: 'relative',
         bottom: '30px',
         left: '10px',
         zIndex: 1000
       }}>
         <a 
-          href="https://github.com/wxcvbnlmjk/vent" 
+          href="https://github.com/wxcvbnlmjk/vents" 
           target="_blank" 
           rel="noopener noreferrer"
           style={{ textDecoration: 'none' }}
         >
           <img 
-            src="https://img.shields.io/github/last-commit/wxcvbnlmjk/vent" 
+            src="https://img.shields.io/github/last-commit/wxcvbnlmjk/vents" 
             alt="Last commit"
             style={{
               height: '20px',
