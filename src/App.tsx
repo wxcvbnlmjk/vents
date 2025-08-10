@@ -250,9 +250,9 @@ function MapWithVelocity() {
   })
   // UI controls
   // density slider maps 1..5000 -> particleMultiplier in [1e-6 .. 5e-3]
-  const [densitySlider, setDensitySlider] = useState<number>(500) // 500 -> 5e-4 (plus de particules visibles)
-  const particleMultiplier = useMemo(() => densitySlider / 1_000_000, [densitySlider])
-  const [lineWidth, setLineWidth] = useState<number>(2.5)
+  const [densitySlider, setDensitySlider] = useState<number>(4000) // 500 -> 5e-4 (plus de particules visibles)
+  const particleMultiplier = useMemo(() => densitySlider / 500000, [densitySlider])
+  const [lineWidth, setLineWidth] = useState<number>(1)
   const mapRef = useRef<L.Map | null>(null)
   const velocityRef = useRef<any>(null)
   const windRef = useRef<any>(null)
@@ -418,7 +418,7 @@ function MapWithVelocity() {
             <input
               type="range"
             min={1}
-            max={5000}
+            max={8000}
               step={1}
               value={densitySlider}
               onChange={(e) => setDensitySlider(Number(e.target.value))}
