@@ -511,7 +511,7 @@ function MapWithVelocity() {
             {/* <span style={{ minWidth: 40 }}>{lineWidth.toFixed(1)}</span> */}
           </label>
         </div>
- 
+        {loading}
         <div style={{
           display: "flex", justifyContent: "flex-end",
           bottom: '-10px',
@@ -593,8 +593,6 @@ function MapWithVelocity() {
         </a>
       </div>
 
- 
-      
     </div>
   )
 }
