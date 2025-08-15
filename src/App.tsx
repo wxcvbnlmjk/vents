@@ -53,6 +53,10 @@ async function fetchWindData(
   const now = new Date()
   now.setMinutes(0, 0, 0)
 
+  // Note: Les modèles haute-résolution (ARPEGE, ICON, GFS) nécessitent l'API payante d'Open-Meteo
+  // L'API gratuite utilise le modèle GFS par défaut
+  // Pour les modèles haute-résolution, voir: https://open-meteo.com/en/docs/historical-weather-api
+
   // Cache clé: bbox + résolution + heure cible
   const pad = (n: number) => String(n).padStart(2, '0')
   const hourKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
@@ -250,9 +254,30 @@ function MapWithVelocity() {
   })
   // UI controls
   // density slider maps 1..5000 -> particleMultiplier in [1e-6 .. 5e-3]
-  const [densitySlider, setDensitySlider] = useState<number>(4000) // 500 -> 5e-4 (plus de particules visibles)
+  const [densitySlider, setDensitySlider] = useState<any>(() => {
+    // Récupérer la préférence depuis le localStorage
+    const densite = localStorage.getItem('densite')
+    if (densite ==null)
+      return 4000;   
+    return densite;
+  })
   const particleMultiplier = useMemo(() => densitySlider / 500000, [densitySlider])
-  const [lineWidth, setLineWidth] = useState<number>(1)
+  const [lineWidth, setLineWidth] = useState<any>(() => {
+    // Récupérer la préférence depuis le localStorage
+    const taille = localStorage.getItem('taille')
+    if (taille ==null)
+      return 1;   
+    return taille;
+  })
+  const [colorchoice, setColorchoice] = useState<any>(() => {
+    // Récupérer la préférence depuis le localStorage
+    const color = localStorage.getItem('colorMode')
+    if (color ==null){
+      localStorage.setItem('colorMode', "#282E82");
+      return ("#282E82").split(',');
+    }  
+    return (""+color).split(',');
+  })
   const mapRef = useRef<L.Map | null>(null)
   const velocityRef = useRef<any>(null)
   const windRef = useRef<any>(null)
@@ -266,6 +291,45 @@ function MapWithVelocity() {
     localStorage.setItem('darkMode', JSON.stringify(newMode))
   }
 
+  const tailleChange = ( e: any ) => {
+    const taille = Number(e.target.value);
+    setLineWidth(taille);
+    localStorage.setItem('taille', ""+taille);
+  }
+
+  const densiteChange = ( e: any ) => {
+    const densite = Number(e.target.value);
+    setDensitySlider(densite);
+    localStorage.setItem('densite', ""+densite);
+  }
+
+  // Fonction pour basculer le mode nuit
+  const toggleColor = () => {
+ 
+    if (colorchoice==null){
+      setColorchoice(["#ffffff"]);  
+    }
+    if (colorchoice.length === 1 && colorchoice[0] === "#ffffff") {
+      // Passer en bleu fonce
+      setColorchoice(["#282E82"] );
+      localStorage.setItem('colorMode', "#282E82");
+    }  
+    else if (colorchoice.length === 1 && colorchoice[0] === "#282E82") {
+        // Passer en multicolore
+        setColorchoice(["#3288bd", "#66c2a5", "#abdda4", "#e6f598", "#fee08b", "#fdae61", "#f46d43", "#d53e4f"] );
+        localStorage.setItem('colorMode', "#3288bd,#66c2a5,#abdda4,#e6f598,#fee08b,#fdae61,#f46d43,#d53e4f");
+      
+    } else {
+        // Passer en blanc
+      setColorchoice(["#ffffff"]);
+      localStorage.setItem('colorMode', "#ffffff")
+    }
+
+    applyVelocityLayer()
+
+  }
+
+
   // Fonction pour mettre à jour la carte selon le mode
   const updateMapTheme = () => {
     const map = mapRef.current
@@ -278,7 +342,7 @@ function MapWithVelocity() {
 
     // Ajouter la nouvelle couche selon le mode
     const tileUrl = isDarkMode 
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
       : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
     
     const attribution = isDarkMode 
@@ -338,6 +402,12 @@ function MapWithVelocity() {
       map.removeLayer(velocityRef.current)
       velocityRef.current = null
     }
+     
+    // Ajuster la densité des particules selon le mode pour une meilleure visibilité
+    const adjustedParticleMultiplier = isDarkMode ? particleMultiplier : particleMultiplier * 2
+ 
+    const adjustedColor = (""+localStorage.getItem('colorMode')).split(',');
+
     // @ts-ignore - fourni par leaflet-velocity
     const v = (L as any).velocityLayer({
       data: wind,
@@ -354,8 +424,9 @@ function MapWithVelocity() {
       minVelocity: 0,
       maxVelocity: 25,
       velocityScale: 0.005,
-      particleMultiplier,
-      lineWidth,
+      colorScale: adjustedColor,
+      particleMultiplier: adjustedParticleMultiplier,
+      lineWidth: isDarkMode ? lineWidth : lineWidth * 1.5, // Épaisseur augmentée en mode jour
     })
     v.addTo(map)
     velocityRef.current = v
@@ -409,7 +480,7 @@ function MapWithVelocity() {
   }, [applyVelocityLayer])
 
   return (
-    <div className={`appContainer ${isDarkMode ? 'dark-mode' : ''}`}>
+    <div className={`appContainer ${isDarkMode ? 'dark-mode' : ''}`} data-theme={isDarkMode ? 'dark' : 'light'}>
       <div className="toolbar">
  
         <div className="sliders">
@@ -421,7 +492,7 @@ function MapWithVelocity() {
             max={8000}
               step={1}
               value={densitySlider}
-              onChange={(e) => setDensitySlider(Number(e.target.value))}
+              onChange={densiteChange}
             />
             {/* <span style={{ minWidth: 80 }}>
               {particleMultiplier.toExponential(1)}
@@ -435,36 +506,43 @@ function MapWithVelocity() {
               max={5}
               step={0.5}
               value={lineWidth}
-              onChange={(e) => setLineWidth(Number(e.target.value))}
+              onChange={tailleChange}
             />
             {/* <span style={{ minWidth: 40 }}>{lineWidth.toFixed(1)}</span> */}
           </label>
         </div>
-        {loading ? <span>Chargement…</span> : null}
-        {dataSource && (
-          <span style={{ 
-            fontSize: '0.8em', 
-            color: dataSource === 'localStorage' ? '#4CAF50' : '#2196F3',
-            fontWeight: 'bold'
-          }}>
-            {dataSource === 'localStorage' ? 'local' : 'API'}
-          </span>
-        )}
+ 
+        <div style={{
+          display: "flex", justifyContent: "flex-end",
+          bottom: '-10px',
+          left: '-10px',
+          zIndex: 1000
+        }}>
+ 
         <button 
           onClick={toggleDarkMode}
-          className="theme-toggle"
+          className="clear-cache-btn"
           title={isDarkMode ? "Passer en mode jour" : "Passer en mode nuit"}
         >
           {isDarkMode ? '☀️' : '🌙'}
         </button>
+
+        <button 
+          onClick={toggleColor}
+          className="clear-cache-btn"
+          title="Couleurs"
+        >
+        🎨
+        </button>   
         <button 
           onClick={clearCacheAndReload}
           className="clear-cache-btn"
           title="Nettoyer le cache et recharger depuis l'API"
         >
         🔄
-        </button>
-      </div>
+        </button>              
+        </div>
+        </div>
 
       <div id="map" className="map" />
         {/* Badge GitHub */}
@@ -499,13 +577,13 @@ function MapWithVelocity() {
         zIndex: 2000
       }}>
         <a 
-          href="https://open-meteo.com/en/docs" 
+          href= {dataSource === 'localStorage' ? '_blank' : 'https://open-meteo.com/en/docs'}  
           target="_blank" 
           rel="noopener noreferrer"
           style={{ textDecoration: 'none' }}
         >
           <img 
-            src="https://img.shields.io/badge/open_meteo-blue" 
+            src={dataSource === 'localStorage' ? 'https://img.shields.io/badge/local-green' : 'https://img.shields.io/badge/open_meteo-blue'}  
             alt="Open-Meteo"
             style={{
               height: '20px',
@@ -515,7 +593,7 @@ function MapWithVelocity() {
         </a>
       </div>
 
-      <div id="map" className="map" />
+ 
       
     </div>
   )
